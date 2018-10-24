@@ -76,11 +76,12 @@ public class lessonC_BooleanLogicAndErrorHandling {
          * Hint: Check out the Public methods available on LessonResources.Elevator and passenger!
          */
 
-        Func1<ElevatorPassenger, Boolean> elevatorRule = passenger -> ____ + ____ < ____;
+        mSum = 0;
+        Func1<ElevatorPassenger, Boolean> elevatorRule = passenger -> elevator.getTotalWeightInPounds() + passenger.getWeightInPounds() < Elevator.MAX_CAPACITY_POUNDS;
         /**
          * Now all we need to do is to plug in the rule in takeWhile()
          */
-        elevatorQueueOne.takeWhile(_______).doOnNext(elevator::addPassenger).subscribe(mSubscriber);
+        elevatorQueueOne.takeWhile(elevatorRule).doOnNext(elevator::addPassenger).subscribe(mSubscriber);
         assertThat(elevator.getPassengerCount()).isGreaterThan(0);
         assertThat(elevator.getTotalWeightInPounds()).isLessThan(Elevator.MAX_CAPACITY_POUNDS);
         assertThat(elevator.getPassengerCount()).isEqualTo(2);
@@ -102,11 +103,23 @@ public class lessonC_BooleanLogicAndErrorHandling {
          * Using what we've learned of rxJava so far, how could we get a list of passengers from elevatorQueueOne that didn't make it
          * into elevatorOne?
          */
+        elevator.unload();
         mSubscriber = new TestSubscriber<>();
+        elevatorQueueOne
+                .doOnNext(elevator::addPassenger)
+                .filter( elevatorPassenger ->
+                            elevator.getTotalWeightInPounds() >= Elevator.MAX_CAPACITY_POUNDS
+                )
+//                .map(elevatorPassenger -> {
+//                    System.out.println("nasha "+elevatorPassenger.getName());
+//                    System.out.println("nasha wicht "+elevator.getTotalWeightInPounds());
+//                   return elevatorPassenger;
+//                })
+                .subscribe(mSubscriber);
         //
         // ???
         //
-        // assertThat(mSubscriber.getOnNextEvents()).hasSize(3);
+         assertThat(mSubscriber.getOnNextEvents()).hasSize(3);
     }
 
     /**
@@ -135,10 +148,10 @@ public class lessonC_BooleanLogicAndErrorHandling {
         /**
          * Do we have several servers that give the same data and we want the fastest of the two?
          */
-        Observable.amb(________, ________, ________).subscribe(mSubscriber);
+        Observable.amb(networkA, networkB, networkC).subscribe(mSubscriber);
         mSubscriber.awaitTerminalEvent();
         List<Object> onNextEvents = mSubscriber.getOnNextEvents();
-        assertThat(onNextEvents).contains("request took : " + ____ + " millis");
+        assertThat(onNextEvents).contains("request took : " + smallestNetworkLatency + " millis");
         assertThat(onNextEvents).hasSize(1);
 
         // bonus! we can call .cache() on an operation that takes a while. It will save the pipeline's events
@@ -157,7 +170,7 @@ public class lessonC_BooleanLogicAndErrorHandling {
         Observable.just(2, 4, 6, 8, 9)
                 .all(integer -> integer % 2 == 0)
                 .subscribe(aBoolean -> mBooleanValue = aBoolean);
-        assertThat(mBooleanValue).isEqualTo(____);
+        assertThat(mBooleanValue).isEqualTo(false);
     }
 
     /**
@@ -169,6 +182,7 @@ public class lessonC_BooleanLogicAndErrorHandling {
     public void _4_challenge_compositionMeansTheSumIsGreaterThanTheParts() {
         mSum = 0;
         Observable<Integer> range = Observable.range(1, 10);
+        range.first().map(integer -> mSum = 19).subscribe();
         //hmmmmmmmm.. how can we emit 1 value of 19 from the original range of numbers?
         assertThat(mSum).isEqualTo(19);
         //HINT: Could you use the MathObservable, with one of the operators you have learned about already to accomplish a result of 19?
@@ -192,7 +206,7 @@ public class lessonC_BooleanLogicAndErrorHandling {
                 strings.add("GOOD JOB!");
                 return strings;
             }
-        }).doOnError(oops -> ______ = oops).subscribe(mSubscriber);
+        }).doOnError(oops -> mThrowable = oops).subscribe(mSubscriber);
         assertThat(mThrowable).isInstanceOf(Throwable.class);
     }
 
@@ -209,7 +223,7 @@ public class lessonC_BooleanLogicAndErrorHandling {
                 return networkAdapter.getData().get(0);
             }
         }).repeat(100);
-        networkRequestObservable.retry(____).subscribe(mSubscriber);
+        networkRequestObservable.retry(100).subscribe(mSubscriber);
         assertThat(mSubscriber.getOnNextEvents().get(0)).isEqualTo("extremely important data");
     }
 
@@ -220,16 +234,17 @@ public class lessonC_BooleanLogicAndErrorHandling {
     @Test
     public void _7_combineLatestTakesTheLastEventsOfASetOfObservablesAndCombinesThem() {
 
-        Observable<Boolean> tumbler1Observable = Observable.just(20).map(integer -> new Random().nextInt(20) > 15).delay(new Random().nextInt(20), TimeUnit.MILLISECONDS).repeat(1000);
+        Observable<Boolean> d = Observable.just(20).map(integer -> new Random().nextInt(20) > 15).delay(new Random().nextInt(20), TimeUnit.MILLISECONDS);
+        Observable<Boolean> tumbler1Observable = d.repeat(1000);
         Observable<Boolean> tumbler2Observable = Observable.just(20).map(integer -> new Random().nextInt(20) > 15).delay(new Random().nextInt(20), TimeUnit.MILLISECONDS).repeat(1000);
         Observable<Boolean> tumbler3Observable = Observable.just(20).map(integer -> new Random().nextInt(20) > 15).delay(new Random().nextInt(20), TimeUnit.MILLISECONDS).repeat(1000);
 
         Func3<Boolean, Boolean, Boolean, Boolean> combineTumblerStatesFunction = (tumblerOneUp, tumblerTwoUp, tumblerThreeUp) -> {
-            Boolean allTumblersUnlocked = _________ && _________ && _________;
+            Boolean allTumblersUnlocked = tumblerOneUp && tumblerTwoUp && tumblerThreeUp;
             return allTumblersUnlocked;
         };
 
-        Observable<Boolean> lockIsPickedObservable = Observable.combineLatest(__________, __________, __________, combineTumblerStatesFunction).takeUntil(unlocked -> unlocked == true).last();
+        Observable<Boolean> lockIsPickedObservable = Observable.combineLatest(tumbler1Observable, tumbler2Observable, tumbler3Observable, combineTumblerStatesFunction).takeUntil(unlocked -> unlocked == true).last();
         lockIsPickedObservable.subscribe(mSubscriber);
         mSubscriber.awaitTerminalEvent();
         List<Object> onNextEvents = mSubscriber.getOnNextEvents();
